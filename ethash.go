@@ -15,6 +15,8 @@
 //
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
+// add log by Sturt
+//	add test
 
 package ethash
 
@@ -25,7 +27,7 @@ int ethashGoCallback_cgo(unsigned);
 */
 import "C"
 
-import (
+import (	
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -41,7 +43,7 @@ import (
 	"unsafe"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/crypto"	
 	"github.com/ethereum/go-ethereum/log"
 )
 
@@ -124,18 +126,24 @@ type Light struct {
 	NumCaches int // Maximum number of caches to keep before eviction (only init, don't modify)
 }
 
+// Insert Verify Debug Codes!!
 // Verify checks whether the block's nonce is valid.
 func (l *Light) Verify(block Block) bool {
 	// TODO: do ethash_quick_verify before getCache in order
 	// to prevent DOS attacks.
 	log.Info("Verify Hash Start...!!!!")
+	
 	blockNum := block.NumberU64()
+	log.Info("Verify: BlockNumber = %v", blockNum)
+	
 	if blockNum >= epochLength*2048 {
 		log.Debug(fmt.Sprintf("block number %d too high, limit is %d", epochLength*2048))
+		log.Info("BlockNumber Fail in Verify...")
 		return false
 	}
 
 	difficulty := block.Difficulty()
+	log.Info("Verify: difficulty = %v / %v", difficulty, common.Big0)
 	/* Cannot happen if block header diff is validated prior to PoW, but can
 		 happen if PoW is checked first due to parallel PoW checking.
 		 We could check the minimum valid difficulty but for SoC we avoid (duplicating)
@@ -143,27 +151,33 @@ func (l *Light) Verify(block Block) bool {
 	*/
 	if difficulty.Cmp(common.Big0) == 0 {
 		log.Debug("invalid block difficulty")
+		log.Info("invalid block difficulty in Verify...")
 		return false
 	}
 
 	cache := l.getCache(blockNum)
 	dagSize := C.ethash_get_datasize(C.uint64_t(blockNum))
+	
+	log.Info("Verify: getCache From Light = %v / dagSize = %v", cache, dagSize)
 	if l.test {
 		dagSize = dagSizeForTesting
 	}
 	// Recompute the hash using the cache.
 	ok, mixDigest, result := cache.compute(uint64(dagSize), block.HashNoNonce(), block.Nonce())
 	if !ok {
+		log.Info("compute Fail in Verify...")
 		return false
 	}
 
 	// avoid mixdigest malleability as it's not included in a block's "hashNononce"
 	if block.MixDigest() != mixDigest {
+		log.Info("compare Mixdigest Fail in Verify...")
 		return false
 	}
 
 	// The actual check.
 	target := new(big.Int).Div(maxUint256, difficulty)
+	log.Info("Verify target: %v", target)
 	return result.Big().Cmp(target) <= 0
 }
 
